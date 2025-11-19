@@ -1,6 +1,10 @@
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,12 +14,12 @@ public class AgeTimelineApp {
     private static final int YEAR_RANGE = 30;
 
     public static void main(String[] args) {
-        List<Character> characters = DataLoader.loadCharacters("data/characters.json");
-        List<Event> events = DataLoader.loadEvents("data/events.json");
+        List<Character> characters = new ArrayList<>(DataLoader.loadCharacters("data/characters.json"));
+        List<Event> events = new ArrayList<>(DataLoader.loadEvents("data/events.json"));
 
         JFrame frame = new JFrame("Возраст персонажей и события");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(700, 550);
+        frame.setSize(1100, 600);
         frame.setLayout(new BorderLayout(10, 10));
 
         JLabel dateLabel = new JLabel("", SwingConstants.CENTER);
@@ -144,6 +148,117 @@ public class AgeTimelineApp {
 
         frame.add(topPanel, BorderLayout.CENTER);
         frame.add(new JScrollPane(output), BorderLayout.SOUTH);
+
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
+                .setPrettyPrinting()
+                .create();
+
+        JTextArea dataDisplay = new JTextArea();
+        dataDisplay.setEditable(false);
+        dataDisplay.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        dataDisplay.setLineWrap(true);
+        dataDisplay.setWrapStyleWord(true);
+
+        Runnable refreshDataDisplay = () -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Characters:\n")
+                    .append(gson.toJson(characters))
+                    .append("\nEvents:\n")
+                    .append(gson.toJson(events));
+            dataDisplay.setText(sb.toString());
+        };
+        refreshDataDisplay.run();
+
+        JPanel characterEditor = new JPanel();
+        characterEditor.setLayout(new BoxLayout(characterEditor, BoxLayout.Y_AXIS));
+        JTextField charNameField = new JTextField();
+        JTextField charBirthField = new JTextField("2000-01-01");
+        JButton addCharacterBtn = new JButton("Add / Update Character");
+
+        addCharacterBtn.addActionListener(e -> {
+            String name = charNameField.getText().trim();
+            String birth = charBirthField.getText().trim();
+            if (name.isEmpty() || birth.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "Введите имя и дату рождения (YYYY-MM-DD)");
+                return;
+            }
+            try {
+                LocalDate birthDate = LocalDate.parse(birth);
+                Character existing = characters.stream()
+                        .filter(c -> c.getName().equalsIgnoreCase(name))
+                        .findFirst()
+                        .orElse(null);
+                if (existing != null) {
+                    existing.setBirthDate(birthDate);
+                } else {
+                    characters.add(new Character(name, birthDate));
+                }
+                update.run();
+                refreshDataDisplay.run();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(frame, "Неверный формат даты: " + birth);
+            }
+        });
+
+        characterEditor.add(new JLabel("Имя персонажа"));
+        characterEditor.add(charNameField);
+        characterEditor.add(Box.createVerticalStrut(5));
+        characterEditor.add(new JLabel("Дата рождения (YYYY-MM-DD)"));
+        characterEditor.add(charBirthField);
+        characterEditor.add(Box.createVerticalStrut(10));
+        characterEditor.add(addCharacterBtn);
+
+        JPanel eventEditor = new JPanel();
+        eventEditor.setLayout(new BoxLayout(eventEditor, BoxLayout.Y_AXIS));
+        JTextField eventNameField = new JTextField();
+        JTextField eventDateField = new JTextField("2024-01-01");
+        JButton addEventBtn = new JButton("Add / Update Event");
+
+        addEventBtn.addActionListener(e -> {
+            String name = eventNameField.getText().trim();
+            String dateText = eventDateField.getText().trim();
+            if (name.isEmpty() || dateText.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "Введите название события и дату (YYYY-MM-DD)");
+                return;
+            }
+            try {
+                LocalDate date = LocalDate.parse(dateText);
+                Event existingEvent = events.stream()
+                        .filter(ev -> ev.getName().equalsIgnoreCase(name))
+                        .findFirst()
+                        .orElse(null);
+                if (existingEvent != null) {
+                    existingEvent.setDate(date);
+                } else {
+                    events.add(new Event(name, date));
+                }
+                timelinePanel.repaint();
+                refreshDataDisplay.run();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(frame, "Неверный формат даты: " + dateText);
+            }
+        });
+
+        eventEditor.add(new JLabel("Название события"));
+        eventEditor.add(eventNameField);
+        eventEditor.add(Box.createVerticalStrut(5));
+        eventEditor.add(new JLabel("Дата проведения (YYYY-MM-DD)"));
+        eventEditor.add(eventDateField);
+        eventEditor.add(Box.createVerticalStrut(10));
+        eventEditor.add(addEventBtn);
+
+        JTabbedPane editorTabs = new JTabbedPane();
+        editorTabs.addTab("Персонажи", new JScrollPane(characterEditor));
+        editorTabs.addTab("События", new JScrollPane(eventEditor));
+
+        JSplitPane dataPanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                new JScrollPane(dataDisplay),
+                editorTabs);
+        dataPanel.setResizeWeight(0.5);
+        dataPanel.setPreferredSize(new Dimension(350, 0));
+
+        frame.add(dataPanel, BorderLayout.EAST);
         frame.setVisible(true);
     }
 }
