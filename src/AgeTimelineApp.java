@@ -3,6 +3,8 @@ import com.google.gson.GsonBuilder;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -213,7 +215,7 @@ public class AgeTimelineApp {
         eventEditor.setLayout(new BoxLayout(eventEditor, BoxLayout.Y_AXIS));
         JTextField eventNameField = new JTextField();
         JTextField eventDateField = new JTextField("2024-01-01");
-        JButton addEventBtn = new JButton("Add / Update Event");
+        JButton addEventBtn = new JButton("Add/Update Event");
 
         addEventBtn.addActionListener(e -> {
             String name = eventNameField.getText().trim();
@@ -252,8 +254,41 @@ public class AgeTimelineApp {
         editorTabs.addTab("Персонажи", new JScrollPane(characterEditor));
         editorTabs.addTab("События", new JScrollPane(eventEditor));
 
+        JButton saveButton = new JButton("Сохранить изменения в JSON");
+        saveButton.setFont(new Font("SansSerif", Font.BOLD, 12));
+        saveButton.addActionListener(e -> {
+            try {
+                // Save characters
+                try (FileWriter writer = new FileWriter("data/characters.json")) {
+                    gson.toJson(characters, writer);
+                }
+                // Save events
+                try (FileWriter writer = new FileWriter("data/events.json")) {
+                    gson.toJson(events, writer);
+                }
+                JOptionPane.showMessageDialog(frame,
+                        "Изменения успешно сохранены в файлы",
+                        "Сохранение завершено",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(frame,
+                        "Ошибка при сохранении файлов:\n" + ex.getMessage(),
+                        "Ошибка сохранения",
+                        JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        });
+
+        JPanel savePanel = new JPanel(new BorderLayout());
+        savePanel.add(saveButton, BorderLayout.CENTER);
+        savePanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+        JPanel topDataPanel = new JPanel(new BorderLayout());
+        topDataPanel.add(savePanel, BorderLayout.NORTH);
+        topDataPanel.add(new JScrollPane(dataDisplay), BorderLayout.CENTER);
+
         JSplitPane dataPanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
-                new JScrollPane(dataDisplay),
+                topDataPanel,
                 editorTabs);
         dataPanel.setResizeWeight(0.5);
         dataPanel.setPreferredSize(new Dimension(350, 0));
